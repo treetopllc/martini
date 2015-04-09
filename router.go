@@ -95,10 +95,13 @@ func (r *router) Handle(res http.ResponseWriter, req *http.Request, context Cont
 	var bestRoute *route
 	for _, route := range r.routes {
 		match, vals := route.Match(req.Method, req.URL.Path)
-		if bestMatch < match {
+		if match.BetterThan(bestMatch) {
 			bestMatch = match
 			bestVals = vals
 			bestRoute = route
+			if match == ExactMatch {
+				break
+			}
 		}
 	}
 
@@ -168,15 +171,21 @@ func newRoute(method string, pattern string, handlers []Handler) *route {
 	return &route
 }
 
-//Higher number = better match
+type RouteMatch int
+
 const (
-	NoMatch = iota
+	NoMatch RouteMatch = iota
 	StarMatch
 	OverloadMatch
 	ExactMatch
 )
 
-func (r route) MatchMethod(method string) int {
+//Higher number = better match
+func (r RouteMatch) BetterThan(o RouteMatch) bool {
+	return r > o
+}
+
+func (r route) MatchMethod(method string) RouteMatch {
 	switch {
 	case method == r.method:
 		return ExactMatch
@@ -189,7 +198,7 @@ func (r route) MatchMethod(method string) int {
 	}
 }
 
-func (r route) Match(method string, path string) (int, map[string]string) {
+func (r route) Match(method string, path string) (RouteMatch, map[string]string) {
 	// add Any method matching support
 	match := r.MatchMethod(method)
 	if match == NoMatch {
